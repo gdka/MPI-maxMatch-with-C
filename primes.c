@@ -85,21 +85,30 @@ void esclavo(){
 		//printf("Soy el hijo %d y recibo el numero %s\n",me,second_half[i]);
 	}
 
-	int cnt_elements;
+	int cnt_elements,cnt_process;
+	MPI_Comm_size(MPI_COMM_WORLD,&cnt_process);
+	cnt_process--;
+	
 	MPI_Bcast(&cnt_elements,1,MPI_INT,0,MPI_COMM_WORLD);
+	
 	//printf("Soy el hijo %d y recibire %d elementos\n",me,cnt_elements);
 
-    for( i = 0; i<cnt_elements; i++){
+    for( i = 0; i<=cnt_elements; i++){
     	int length_first;
     	MPI_Recv(&length_first,1,MPI_INT,0,0,MPI_COMM_WORLD, &estado);
     	//printf("Soy el hijo %d y recibo un numero con %d digitos\n",me,length_first);
+    	if(length_first==0) break;
     	length_first++;
     	char *number = (char*)malloc(sizeof(char)*length_first);
-    	MPI_Recv(number,length_first+1,MPI_CHAR,0,0,MPI_COMM_WORLD,&estado);
+    	MPI_Recv(number,length_first,MPI_CHAR,0,0,MPI_COMM_WORLD,&estado);
     	//printf("Soy el hijo %d y recibo el numero %s\n",me,number);
-    	verify(second_half,number,num_elem,(me-1)*cnt_elements+i);
+    		
+     	if(i==cnt_elements) verify(second_half,number,num_elem,cnt_process*cnt_elements-1+me);
+    	else verify(second_half,number,num_elem,(me-1)*cnt_elements+i);
     	free(number);
     }
+    
+	
 
 }
 //­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­­
@@ -108,6 +117,11 @@ void maestro(){
 	MPI_Status estado;
 	int i,j;
 	scanf("%d",&num_elements);
+	
+	int cnt_process;
+	
+	MPI_Comm_size(MPI_COMM_WORLD,&cnt_process);
+	
 	//printf("Soy el padre y voy a leer %d elementos\n",num_elements);
 	MPI_Bcast(&num_elements,1,MPI_INT,0,MPI_COMM_WORLD);
 	char str[MAXN][2][MAXP];
@@ -120,13 +134,12 @@ void maestro(){
 		MPI_Bcast(&length,1,MPI_INT,0,MPI_COMM_WORLD);
 		MPI_Bcast(str[i][0],length+1,MPI_CHAR,0,MPI_COMM_WORLD);
 	}
-	int cnt_process;
-	
-	MPI_Comm_size(MPI_COMM_WORLD,&cnt_process);
+
 	
 	cnt_process--;
 
 	int cnt = num_elements / cnt_process; 
+	
  
 	MPI_Bcast(&cnt,1,MPI_INT,0,MPI_COMM_WORLD);
 	
@@ -138,6 +151,21 @@ void maestro(){
 			MPI_Send(&length,1,MPI_INT,i,0,MPI_COMM_WORLD);
 			MPI_Send(str[(i-1)*cnt+j][1],length+1,MPI_CHAR,i,0,MPI_COMM_WORLD);
 		}
+	}
+	
+	int mod = num_elements % cnt_process; 
+	
+	for(i=1; i<=mod; i++){
+		int length;
+		scanf("%s",str[cnt*cnt_process-1+i][1]);
+		length = strlen(str[cnt*cnt_process-1+i][1]);
+		MPI_Send(&length,1,MPI_INT,i,0,MPI_COMM_WORLD);
+		MPI_Send(str[cnt*cnt_process-1+i][1],length+1,MPI_CHAR,i,0,MPI_COMM_WORLD);
+	}
+	
+	for(i=mod+1; i<=cnt_process; i++){
+		int length = 0;
+		MPI_Send(&length,1,MPI_INT,i,0,MPI_COMM_WORLD);
 	}
 	
 	for( i = 0; i<num_elements*num_elements; i++){
